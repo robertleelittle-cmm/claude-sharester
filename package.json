@@ -1,0 +1,23 @@
+{
+  "name": "claude-sharester",
+  "version": "0.1.0",
+  "description": "Sync Claude Code commands from GitHub repos and Confluence pages",
+  "type": "module",
+  "bin": {
+    "claude-sharester": "./bin/claude-sharester.js"
+  },
+  "main": "./src/cli.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "keywords": ["claude", "claude-code", "ai", "cli", "commands"],
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "execa": "^9.3.0"
+  }
+}
