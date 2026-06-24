@@ -114,17 +114,39 @@ After running `claude-sharester init`, open a new terminal or run `source ~/.zsh
 
 ## Confluence sources
 
-A Confluence page can define commands using code blocks. Each `code` macro block becomes one `.md` command file. The command name is taken from:
+claude-sharester supports two Confluence page layouts automatically:
+
+**Hub/index page** — a parent page whose child subpages each contain one command. Each child page's body becomes a `.md` command file; the command name is derived from the child page title (stripping any ` — Skill Source` / ` — Command Source` suffix). Point the source at the parent page and all children are synced:
+
+```bash
+claude-sharester add confluence 3937697989 --prefix rob
+claude-sharester sync
+# → rob-argo-deploy.md, rob-pr-screenshots.md, rob-release.md, …
+```
+
+**Single page with code blocks** — a page that has no children but contains Confluence `Code` macro blocks. Each block becomes one command. The command name is taken from:
 1. The macro's **title** parameter (set in the code block settings panel), or
 2. The nearest preceding heading on the page
 
 The page ID can be a numeric ID from the URL, or a Confluence tiny-link key (the short alphanumeric code after `/wiki/x/` in a short URL — e.g. `xYC06g`). claude-sharester resolves tiny links automatically.
 
 ```bash
-claude-sharester add confluence 12345678 --prefix team
 claude-sharester add confluence xYC06g --prefix wiki
 claude-sharester sync
 ```
+
+When a Confluence source's command set changes (children added or removed), stale command files are cleaned up automatically on the next sync.
+
+## Update notifications
+
+After each command, claude-sharester checks once per day whether a newer version is available on GitHub. If one is found, it prints a notice and the command to update:
+
+```
+  Update available: 0.1.0 → 0.1.1
+  Run: git -C /path/to/claude-sharester pull
+```
+
+The check is non-blocking and silently skipped when offline or if the network times out. The last-checked timestamp is stored in `~/.claude/sharester.json` as `lastVersionCheck`.
 
 ## Local development
 
