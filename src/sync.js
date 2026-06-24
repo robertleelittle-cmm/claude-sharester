@@ -1,6 +1,6 @@
 import { syncGithub } from './sources/github.js';
 import { syncConfluence } from './sources/confluence.js';
-import { syncSymlinks, pruneStaleSymlinks, syncSkillDirs, pruneStaleSkillDirs, demoteCommandLinks } from './symlinks.js';
+import { syncSymlinks, pruneStaleSymlinks, syncSkillDirs, pruneObsoleteSkillDirs, demoteCommandLinks } from './symlinks.js';
 import { loadConfig, saveConfig } from './config.js';
 import chalk from 'chalk';
 
@@ -30,9 +30,6 @@ export async function syncAll(opts = {}) {
       const stale = pruneStaleSymlinks(source.prefix);
       if (stale.length) console.log(chalk.dim(`  Removed stale: ${stale.join(', ')}`));
 
-      const staleSkills = pruneStaleSkillDirs(source.prefix);
-      if (staleSkills.length) console.log(chalk.dim(`  Removed stale skills: ${staleSkills.join(', ')}`));
-
       // Move any existing command symlinks for skill files to the skills dir
       demoteCommandLinks(source.prefix, skills.map(s => s.skillName));
 
@@ -43,6 +40,11 @@ export async function syncAll(opts = {}) {
       const { created: skillCreated, skipped: skillSkipped } = syncSkillDirs(source.prefix, skills);
       if (skillCreated.length) console.log(chalk.green(`  Skills created: ${skillCreated.join(', ')}`));
       if (skillSkipped.length) console.log(chalk.dim(`  Skills up to date: ${skillSkipped.join(', ')}`));
+
+      // Prune skill dirs that are no longer in this source's skill set
+      const currentDirNames = skills.map(s => `${source.prefix}-${s.skillName}`);
+      const obsolete = pruneObsoleteSkillDirs(source.prefix, currentDirNames);
+      if (obsolete.length) console.log(chalk.dim(`  Removed stale skills: ${obsolete.join(', ')}`));
 
       source.lastSynced = new Date().toISOString();
     } catch (err) {
