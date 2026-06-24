@@ -2,17 +2,17 @@
 
 Sync [Claude Code](https://claude.ai/code) commands from GitHub repos and Confluence pages. Add sources from your teammates, keep them up to date automatically.
 
+## Requirements
+
+- Node.js >= 18
+
 ## Install
 
 ```bash
 npm install -g claude-sharester
 ```
 
-Or run without installing:
-
-```bash
-npx claude-sharester <command>
-```
+> **Note:** `npx claude-sharester` will work once this package is published to npm. Until then, use the [local development](#local-development) setup below.
 
 ## Quickstart
 
@@ -90,9 +90,31 @@ npm link        # makes `claude-sharester` available globally from this local co
 
 Changes to `src/` are reflected immediately — no build step required.
 
+To undo the global link:
+
+```bash
+npm unlink -g claude-sharester
+```
+
+## Scheduling and logs
+
+When auto-sync is running, all output is written to `~/.claude/skills/sharester.log`. Check it if a sync seems to have failed silently:
+
+```bash
+tail -f ~/.claude/skills/sharester.log
+```
+
+To confirm the LaunchAgent is loaded:
+
+```bash
+launchctl list | grep sharester
+```
+
 ## Config
 
 Sources are stored at `~/.claude/sharester.json`. Symlinks are created in `~/.claude/commands/` and `~/.claude/scripts/`. Synced repos are cloned to `~/.claude/skills/<id>/`.
+
+> **Note:** `claude-sharester remove <id>` deletes the source's symlinks but leaves the cloned repo under `~/.claude/skills/<id>/` on disk. Remove that directory manually if you want to free the space.
 
 ## Migrating from a manual setup
 
