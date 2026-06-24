@@ -6,6 +6,7 @@ import { removeSourceSymlinks } from './symlinks.js';
 import { scheduleSync, unschedule, getScheduleStatus } from './schedule.js';
 import { runInit } from './init.js';
 import { ask, choose, pickSource } from './prompt.js';
+import { checkForUpdates } from './update-check.js';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -395,5 +396,7 @@ program
 
     console.log(chalk.dim(`\nConfig: ${getConfigPath()}\n`));
   });
+
+program.hook('postAction', async () => { await checkForUpdates(); });
 
 program.parse();
