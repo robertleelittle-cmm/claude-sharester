@@ -34,16 +34,19 @@ Commands are symlinked as `<prefix>-<commandname>.md` so multiple teammates' com
 | Command | Description |
 |---|---|
 | `init` | Interactively configure Atlassian credentials in your shell profile |
-| `add github <url> [--prefix name] [--id id]` | Register a GitHub repo source |
-| `add confluence <pageId> --prefix name` | Register a Confluence page source |
-| `remove <id>` | Remove a source and delete its symlinks |
-| `set-branch <id> <branch> [--remote <url>]` | Sync from a fork branch instead of main |
-| `clear-branch <id>` | Remove branch override, revert to main on next sync |
+| `add` | Interactive wizard — prompts for type, URL/pageId, prefix, and ID |
+| `add github [url] [--prefix name] [--id id]` | Register a GitHub repo source (prompts if URL omitted) |
+| `add confluence [pageId] [--prefix name] [--id id]` | Register a Confluence page source (prompts if pageId or prefix omitted) |
+| `remove [id]` | Remove a source and delete its symlinks (prompts to pick if ID omitted) |
+| `set-branch [id] [branch] [--remote <url>]` | Sync from a fork branch instead of main (prompts if args omitted) |
+| `clear-branch [id]` | Remove branch override, revert to main on next sync (prompts if ID omitted) |
 | `list` | Show all configured sources |
 | `sync [--source id]` | Pull all sources (or one) and refresh symlinks |
 | `schedule [--interval 15m] [--method launchagent\|cron]` | Install auto-sync daemon |
 | `unschedule` | Remove the auto-sync daemon |
 | `status` | Show sync status and schedule |
+
+All arguments are optional — omit any required value and the CLI will prompt you interactively.
 
 ## Branch overrides
 
@@ -107,14 +110,19 @@ This prompts for the three values below and writes them to `~/.zshrc` (or `~/.ba
 
 After running `claude-sharester init`, open a new terminal or run `source ~/.zshrc` for the exports to take effect.
 
+> **Note:** These same `JIRA_*` variables are also used for Confluence syncs — no separate `CONFLUENCE_*` vars needed. The Confluence REST API lives at `JIRA_BASE_URL/wiki`, so one set of credentials covers both.
+
 ## Confluence sources
 
 A Confluence page can define commands using code blocks. Each `code` macro block becomes one `.md` command file. The command name is taken from:
 1. The macro's **title** parameter (set in the code block settings panel), or
 2. The nearest preceding heading on the page
 
+The page ID can be a numeric ID from the URL, or a Confluence tiny-link key (the short alphanumeric code after `/wiki/x/` in a short URL — e.g. `xYC06g`). claude-sharester resolves tiny links automatically.
+
 ```bash
 claude-sharester add confluence 12345678 --prefix team
+claude-sharester add confluence xYC06g --prefix wiki
 claude-sharester sync
 ```
 

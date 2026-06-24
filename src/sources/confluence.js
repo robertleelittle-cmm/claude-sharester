@@ -3,16 +3,20 @@ import { join } from 'path';
 import { getSkillsDir } from '../config.js';
 
 export async function syncConfluence(source) {
-  const { CONFLUENCE_BASE_URL, CONFLUENCE_EMAIL, CONFLUENCE_API_TOKEN } = process.env;
+  const baseUrl = process.env.CONFLUENCE_BASE_URL
+    ?? (process.env.JIRA_BASE_URL ? `${process.env.JIRA_BASE_URL}/wiki` : undefined);
+  const email = process.env.CONFLUENCE_EMAIL ?? process.env.JIRA_EMAIL;
+  const token = process.env.CONFLUENCE_API_TOKEN ?? process.env.JIRA_API_TOKEN;
 
-  if (!CONFLUENCE_BASE_URL || !CONFLUENCE_EMAIL || !CONFLUENCE_API_TOKEN) {
+  if (!baseUrl || !email || !token) {
     throw new Error(
-      'Confluence auth env vars required: CONFLUENCE_BASE_URL, CONFLUENCE_EMAIL, CONFLUENCE_API_TOKEN'
+      'Confluence auth required: set JIRA_BASE_URL/EMAIL/API_TOKEN (or CONFLUENCE_BASE_URL/EMAIL/API_TOKEN). Run `claude-sharester init` to configure.'
     );
   }
 
-  const credentials = Buffer.from(`${CONFLUENCE_EMAIL}:${CONFLUENCE_API_TOKEN}`).toString('base64');
-  const url = `${CONFLUENCE_BASE_URL}/rest/api/content/${source.pageId}?expand=body.storage`;
+  const credentials = Buffer.from(`${email}:${token}`).toString('base64');
+  const pageId = await resolvePageId(baseUrl, source.pageId, credentials);
+  const url = `${baseUrl}/rest/api/content/${pageId}?expand=body.storage`;
 
   const res = await fetch(url, {
     headers: { Authorization: `Basic ${credentials}`, Accept: 'application/json' },
@@ -38,6 +42,22 @@ export async function syncConfluence(source) {
   }
 
   return { commands, scripts: [] };
+}
+
+async function resolvePageId(baseUrl, pageId, credentials) {
+  if (/^\d+$/.test(pageId)) return pageId;
+  // Tiny link — follow the redirect to extract the numeric ID
+  const tinyUrl = `${baseUrl}/x/${pageId}`;
+  const res = await fetch(tinyUrl, {
+    headers: { Authorization: `Basic ${credentials}` },
+    redirect: 'follow',
+  });
+  if (!res.ok) throw new Error(`Could not resolve Confluence page "${pageId}": ${res.status}`);
+  // Final URL contains the numeric page ID in its path
+  const finalUrl = res.url;
+  const match = finalUrl.match(/\/pages\/(\d+)/);
+  if (!match) throw new Error(`Could not extract page ID from resolved URL: ${finalUrl}`);
+  return match[1];
 }
 
 function parseCodeBlocks(storageXml) {
