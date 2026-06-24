@@ -4,6 +4,7 @@ import { loadConfig, saveConfig, ensureDirs, getConfigPath } from './config.js';
 import { syncAll } from './sync.js';
 import { removeSourceSymlinks } from './symlinks.js';
 import { scheduleSync, unschedule, getScheduleStatus } from './schedule.js';
+import { runInit } from './init.js';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -15,6 +16,15 @@ program
   .name('claude-sharester')
   .description('Sync Claude Code commands from GitHub repos and Confluence pages')
   .version(pkg.version);
+
+// ── init ─────────────────────────────────────────────────────────────────────
+
+program
+  .command('init')
+  .description('Set up Jira credentials in your shell init file')
+  .action(async () => {
+    await runInit();
+  });
 
 // ── add ──────────────────────────────────────────────────────────────────────
 
@@ -95,6 +105,51 @@ program
     if (removed.length) console.log(chalk.dim(`Deleted symlinks: ${removed.join(', ')}`));
   });
 
+// ── set-branch ───────────────────────────────────────────────────────────────
+
+program
+  .command('set-branch <id> <branch>')
+  .description('Pin a source to a specific branch (e.g. a PR branch on a fork)')
+  .option('--remote <url>', 'Fork URL to fetch from (defaults to the source URL)')
+  .action((id, branch, opts) => {
+    const config = loadConfig();
+    const source = config.sources.find(s => s.id === id);
+    if (!source) {
+      console.error(chalk.red(`No source found with id "${id}".`));
+      process.exit(1);
+    }
+    if (source.type !== 'github') {
+      console.error(chalk.red('Branch overrides are only supported for GitHub sources.'));
+      process.exit(1);
+    }
+    source.override = { branch, ...(opts.remote ? { remote: opts.remote } : {}) };
+    saveConfig(config);
+    const remoteNote = opts.remote ? ` from ${opts.remote}` : '';
+    console.log(chalk.green(`Branch override set for "${id}": ${branch}${remoteNote}.`));
+    console.log(chalk.dim('Run `claude-sharester sync` to apply. Override auto-clears when the branch is deleted.'));
+  });
+
+// ── clear-branch ──────────────────────────────────────────────────────────────
+
+program
+  .command('clear-branch <id>')
+  .description('Remove a branch override, reverting to main on next sync')
+  .action((id) => {
+    const config = loadConfig();
+    const source = config.sources.find(s => s.id === id);
+    if (!source) {
+      console.error(chalk.red(`No source found with id "${id}".`));
+      process.exit(1);
+    }
+    if (!source.override) {
+      console.log(chalk.yellow(`No branch override set for "${id}".`));
+      return;
+    }
+    delete source.override;
+    saveConfig(config);
+    console.log(chalk.green(`Branch override cleared for "${id}". Run \`claude-sharester sync\` to revert to main.`));
+  });
+
 // ── list ──────────────────────────────────────────────────────────────────────
 
 program
@@ -112,6 +167,10 @@ program
       const detail = s.type === 'github' ? s.url : `page ${s.pageId}`;
       console.log(`  ${chalk.cyan(s.id)} (${s.type}) — prefix: ${chalk.bold(s.prefix)} — ${detail}`);
       console.log(chalk.dim(`    last synced: ${synced}`));
+      if (s.override) {
+        const remoteNote = s.override.remote ? ` from ${s.override.remote}` : '';
+        console.log(chalk.yellow(`    branch override: ${s.override.branch}${remoteNote}`));
+      }
     }
     console.log();
   });
@@ -174,6 +233,10 @@ program
       for (const s of config.sources) {
         const synced = s.lastSynced ? new Date(s.lastSynced).toLocaleString() : chalk.yellow('never');
         console.log(`  ${chalk.cyan(s.id)} — last synced: ${synced}`);
+        if (s.override) {
+          const remoteNote = s.override.remote ? ` from ${s.override.remote}` : '';
+          console.log(chalk.yellow(`    override: ${s.override.branch}${remoteNote}`));
+        }
       }
     }
 

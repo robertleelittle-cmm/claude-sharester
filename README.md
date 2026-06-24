@@ -33,14 +33,43 @@ Commands are symlinked as `<prefix>-<commandname>.md` so multiple teammates' com
 
 | Command | Description |
 |---|---|
+| `init` | Interactively configure Atlassian credentials in your shell profile |
 | `add github <url> [--prefix name] [--id id]` | Register a GitHub repo source |
 | `add confluence <pageId> --prefix name` | Register a Confluence page source |
 | `remove <id>` | Remove a source and delete its symlinks |
+| `set-branch <id> <branch> [--remote <url>]` | Sync from a fork branch instead of main |
+| `clear-branch <id>` | Remove branch override, revert to main on next sync |
 | `list` | Show all configured sources |
 | `sync [--source id]` | Pull all sources (or one) and refresh symlinks |
 | `schedule [--interval 15m] [--method launchagent\|cron]` | Install auto-sync daemon |
 | `unschedule` | Remove the auto-sync daemon |
 | `status` | Show sync status and schedule |
+
+## Branch overrides
+
+Test a teammate's PR branch before it merges — point any GitHub source at a fork branch and sync from it instead of main.
+
+```bash
+# Your fork's PR branch
+claude-sharester set-branch owen standup-temp-dir-and-browser-open \
+  --remote https://github.com/your-fork/tools.git
+claude-sharester sync
+```
+
+The override is stored in config and applied on every sync. When the PR is merged and the branch is deleted, the next sync detects the missing branch, prints a notice, and automatically reverts to main — no manual cleanup needed:
+
+```
+⚠  Branch "standup-temp-dir-and-browser-open" no longer exists on remote — override cleared, reverted to main.
+```
+
+To clear manually before the branch is deleted:
+
+```bash
+claude-sharester clear-branch owen
+claude-sharester sync
+```
+
+Active overrides are shown in `claude-sharester list` and `claude-sharester status`.
 
 ## GitHub sources
 
@@ -58,19 +87,31 @@ their-repo/
 
 After `claude-sharester sync`, these appear in your Claude Code as `/alice-standup` and `/alice-review`.
 
+## Atlassian credentials
+
+Confluence sources and any synced scripts that call the Jira or Confluence APIs require credentials in your shell environment. Run the interactive setup wizard to configure them:
+
+```bash
+claude-sharester init
+```
+
+This prompts for the three values below and writes them to `~/.zshrc` (or `~/.bashrc`), updating existing entries in-place rather than duplicating them.
+
+| Variable | Example value |
+|---|---|
+| `JIRA_BASE_URL` | `https://yourcompany.atlassian.net` |
+| `JIRA_EMAIL` | `you@yourcompany.com` |
+| `JIRA_API_TOKEN` | _(see below)_ |
+
+**Getting an API token:** Go to [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens), click **Create API token**, give it a label, and copy the value. Treat it like a password — do not commit it to source control.
+
+After running `claude-sharester init`, open a new terminal or run `source ~/.zshrc` for the exports to take effect.
+
 ## Confluence sources
 
 A Confluence page can define commands using code blocks. Each `code` macro block becomes one `.md` command file. The command name is taken from:
 1. The macro's **title** parameter (set in the code block settings panel), or
 2. The nearest preceding heading on the page
-
-Auth is configured via environment variables (add these to your shell profile):
-
-```bash
-export CONFLUENCE_BASE_URL=https://yourcompany.atlassian.net/wiki
-export CONFLUENCE_EMAIL=you@yourcompany.com
-export CONFLUENCE_API_TOKEN=your-api-token   # https://id.atlassian.com/manage-profile/security/api-tokens
-```
 
 ```bash
 claude-sharester add confluence 12345678 --prefix team

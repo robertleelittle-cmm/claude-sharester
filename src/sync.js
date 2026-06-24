@@ -18,9 +18,14 @@ export async function syncAll(opts = {}) {
   for (const source of sources) {
     console.log(chalk.cyan(`\nSyncing ${source.id} (${source.type}: ${source.url ?? source.pageId})...`));
     try {
-      const { commands, scripts } = source.type === 'github'
+      const { commands, scripts, overrideCleared } = source.type === 'github'
         ? await syncGithub(source)
         : await syncConfluence(source);
+
+      if (overrideCleared) {
+        console.log(chalk.yellow(`  Branch "${source.override.branch}" no longer exists on remote — override cleared, reverted to main.`));
+        delete source.override;
+      }
 
       const stale = pruneStaleSymlinks(source.prefix);
       if (stale.length) console.log(chalk.dim(`  Removed stale: ${stale.join(', ')}`));
