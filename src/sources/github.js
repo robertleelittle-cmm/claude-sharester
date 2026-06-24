@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync, lstatSync } from 'fs';
 import { join, basename, extname } from 'path';
 import { execa } from 'execa';
 import { getSkillsDir, getScriptsDir } from '../config.js';
@@ -12,13 +12,32 @@ export async function syncGithub(source) {
 
   const scriptNames = new Set(scripts.map(s => s.scriptName));
 
-  const commands = discoverFiles(join(cloneDir, '.claude', 'commands'), '.md')
-    .map(filePath => ({
-      commandName: basename(filePath),
-      filePath: rewriteScriptRefs(filePath, source.prefix, scriptNames, cloneDir),
-    }));
+  const commands = [];
+  const skills = [];
+  for (const filePath of discoverFiles(join(cloneDir, '.claude', 'commands'), '.md')) {
+    const processed = rewriteScriptRefs(filePath, source.prefix, scriptNames, cloneDir);
+    const content = readFileSync(processed, 'utf8');
+    const skillName = extractSkillName(content);
+    if (skillName) {
+      skills.push({ skillName, filePath: processed });
+    } else {
+      commands.push({ commandName: basename(filePath), filePath: processed });
+    }
+  }
 
-  return { commands, scripts, cloneDir, overrideCleared };
+  // Also pick up .claude/skills/<name>/SKILL.md in the repo
+  const skillsSourceDir = join(cloneDir, '.claude', 'skills');
+  if (existsSync(skillsSourceDir)) {
+    for (const entry of readdirSync(skillsSourceDir)) {
+      const skillFile = join(skillsSourceDir, entry, 'SKILL.md');
+      if (!existsSync(skillFile)) continue;
+      const content = readFileSync(skillFile, 'utf8');
+      const skillName = extractSkillName(content) ?? entry;
+      skills.push({ skillName, filePath: skillFile });
+    }
+  }
+
+  return { commands, skills, scripts, cloneDir, overrideCleared };
 }
 
 // Checks out the right ref for the source: override branch if set and still
@@ -100,6 +119,13 @@ function rewriteScriptRefs(filePath, prefix, scriptNames, cloneDir) {
   const processedPath = join(processedDir, basename(filePath));
   writeFileSync(processedPath, rewritten, 'utf8');
   return processedPath;
+}
+
+function extractSkillName(content) {
+  const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!fmMatch) return null;
+  const nameMatch = fmMatch[1].match(/^name:\s*(.+)$/m);
+  return nameMatch?.[1]?.trim().replace(/^['"]|['"]$/g, '') ?? null;
 }
 
 function discoverFiles(dir, ext = null) {

@@ -1,6 +1,6 @@
 import { syncGithub } from './sources/github.js';
 import { syncConfluence } from './sources/confluence.js';
-import { syncSymlinks, pruneStaleSymlinks } from './symlinks.js';
+import { syncSymlinks, pruneStaleSymlinks, syncSkillDirs, pruneStaleSkillDirs, demoteCommandLinks } from './symlinks.js';
 import { loadConfig, saveConfig } from './config.js';
 import chalk from 'chalk';
 
@@ -18,7 +18,7 @@ export async function syncAll(opts = {}) {
   for (const source of sources) {
     console.log(chalk.cyan(`\nSyncing ${source.id} (${source.type}: ${source.url ?? source.pageId})...`));
     try {
-      const { commands, scripts, overrideCleared } = source.type === 'github'
+      const { commands, scripts, skills = [], overrideCleared } = source.type === 'github'
         ? await syncGithub(source)
         : await syncConfluence(source);
 
@@ -30,9 +30,19 @@ export async function syncAll(opts = {}) {
       const stale = pruneStaleSymlinks(source.prefix);
       if (stale.length) console.log(chalk.dim(`  Removed stale: ${stale.join(', ')}`));
 
+      const staleSkills = pruneStaleSkillDirs(source.prefix);
+      if (staleSkills.length) console.log(chalk.dim(`  Removed stale skills: ${staleSkills.join(', ')}`));
+
+      // Move any existing command symlinks for skill files to the skills dir
+      demoteCommandLinks(source.prefix, skills.map(s => s.skillName));
+
       const { created, skipped } = syncSymlinks(source.prefix, commands, scripts);
       if (created.length) console.log(chalk.green(`  Created: ${created.join(', ')}`));
       if (skipped.length) console.log(chalk.dim(`  Up to date: ${skipped.join(', ')}`));
+
+      const { created: skillCreated, skipped: skillSkipped } = syncSkillDirs(source.prefix, skills);
+      if (skillCreated.length) console.log(chalk.green(`  Skills created: ${skillCreated.join(', ')}`));
+      if (skillSkipped.length) console.log(chalk.dim(`  Skills up to date: ${skillSkipped.join(', ')}`));
 
       source.lastSynced = new Date().toISOString();
     } catch (err) {

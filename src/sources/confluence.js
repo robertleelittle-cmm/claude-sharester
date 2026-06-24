@@ -40,6 +40,7 @@ export async function syncConfluence(source) {
     const children = childData.results ?? [];
     if (children.length > 0) {
       const commands = [];
+      const skills = [];
       for (const child of children) {
         const childStorage = child.body?.storage?.value ?? '';
         if (!childStorage.trim()) continue;
@@ -49,24 +50,41 @@ export async function syncConfluence(source) {
         const fileName = `${name}.md`;
         const filePath = join(outDir, fileName);
         writeFileSync(filePath, content, 'utf8');
-        commands.push({ commandName: fileName, filePath });
+        const skillName = extractSkillName(content);
+        if (skillName) {
+          skills.push({ skillName, filePath });
+        } else {
+          commands.push({ commandName: fileName, filePath });
+        }
       }
-      pruneOutDir(outDir, commands.map(c => c.commandName));
-      return { commands, scripts: [] };
+      pruneOutDir(outDir, [
+        ...commands.map(c => c.commandName),
+        ...skills.map(s => `${s.skillName}.md`),
+      ]);
+      return { commands, skills, scripts: [] };
     }
   }
 
   // Mode 2: no child pages → extract code macro blocks from the page itself
   const codeBlocks = parseCodeBlocks(storageBody);
   const commands = [];
+  const skills = [];
   for (const { name, content } of codeBlocks) {
     const fileName = `${name}.md`;
     const filePath = join(outDir, fileName);
     writeFileSync(filePath, content, 'utf8');
-    commands.push({ commandName: fileName, filePath });
+    const skillName = extractSkillName(content);
+    if (skillName) {
+      skills.push({ skillName, filePath });
+    } else {
+      commands.push({ commandName: fileName, filePath });
+    }
   }
-  pruneOutDir(outDir, commands.map(c => c.commandName));
-  return { commands, scripts: [] };
+  pruneOutDir(outDir, [
+    ...commands.map(c => c.commandName),
+    ...skills.map(s => `${s.skillName}.md`),
+  ]);
+  return { commands, skills, scripts: [] };
 }
 
 // Remove files in outDir that are no longer in the current command set, so
@@ -79,6 +97,15 @@ function pruneOutDir(outDir, currentFileNames) {
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+
+// Returns the `name:` value from YAML frontmatter if present, otherwise null.
+// Files with a name field are skills; files without are plain commands.
+function extractSkillName(content) {
+  const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!fmMatch) return null;
+  const nameMatch = fmMatch[1].match(/^name:\s*(.+)$/m);
+  return nameMatch?.[1]?.trim().replace(/^['"]|['"]$/g, '') ?? null;
+}
 
 async function resolvePageId(baseUrl, pageId, headers) {
   if (/^\d+$/.test(pageId)) return pageId;
@@ -110,10 +137,11 @@ function storageXmlToMarkdown(xml) {
     (_, code) => `\`\`\`\n${code.trim()}\n\`\`\`\n`
   );
 
-  // Headings
+  // Headings — convert <br> to newlines before stripping tags so multi-line
+  // heading content (e.g. YAML frontmatter fields) retains its line breaks.
   for (let n = 6; n >= 1; n--) {
     out = out.replace(new RegExp(`<h${n}[^>]*>([\\s\\S]*?)<\\/h${n}>`, 'g'),
-      (_, t) => `${'#'.repeat(n)} ${stripTags(t).trim()}\n`);
+      (_, t) => `${'#'.repeat(n)} ${t.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').trim()}\n`);
   }
 
   // Bold / italic
@@ -158,15 +186,22 @@ function storageXmlToMarkdown(xml) {
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ');
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&rarr;/g, '→')
+    .replace(/&larr;/g, '←')
+    .replace(/&mdash;/g, '—')
+    .replace(/&ndash;/g, '–')
+    .replace(/&hellip;/g, '...');
 
   // Normalise blank lines
   out = out.replace(/\n{3,}/g, '\n\n').trim() + '\n';
 
-  // Restore YAML frontmatter: Confluence converts ---\nkey: val\n--- into
-  // <hr> + <h2>key: val</h2> (the trailing --- is consumed as a setext underline).
-  // Only match heading lines that look like key: value pairs (contain a colon).
-  out = out.replace(/^---\n((?:#+ \w[^:\n]+:[^\n]*\n)+)/, (_, fields) => {
+  // Restore YAML frontmatter. Confluence converts ---\nkey: val\n--- into
+  // <hr> + <h2>key: val</h2>. When frontmatter has multiple fields they all
+  // land in one <h2> separated by <br>, producing a multi-line heading where
+  // only the first line has a ## prefix and the rest are plain key:value lines.
+  // Allow both forms: heading-prefixed first line and bare continuation lines.
+  out = out.replace(/^---\n((?:(?:#+ )?\w[\w-]*:\s*[^\n]*\n)+)/, (_, fields) => {
     const yaml = fields.replace(/^#+ /gm, '').trim();
     return `---\n${yaml}\n---\n\n`;
   });

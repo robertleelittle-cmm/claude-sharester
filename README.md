@@ -76,19 +76,22 @@ Active overrides are shown in `claude-sharester list` and `claude-sharester stat
 
 ## GitHub sources
 
-Your teammate's repo should have Claude Code commands at `.claude/commands/*.md`. Supporting scripts at `.claude/scripts/*` are also synced automatically.
+Your teammate's repo should have Claude Code commands at `.claude/commands/*.md`. Supporting scripts at `.claude/scripts/*` are also synced automatically. Skills (`.claude/skills/<name>/SKILL.md` or any command file with a `name:` YAML frontmatter field) are installed to `~/.claude/skills/` so they appear in the Claude Code skills list, not just the slash-command list.
 
 ```
 their-repo/
 └── .claude/
     ├── commands/
-    │   ├── standup.md
-    │   └── review.md
+    │   ├── standup.md       ← installed as /alice-standup command
+    │   └── review.md        ← installed as /alice-review command
+    ├── skills/
+    │   └── platform-quality/
+    │       └── SKILL.md     ← installed as /alice-platform-quality skill
     └── scripts/
         └── standup.js
 ```
 
-After `claude-sharester sync`, these appear in your Claude Code as `/alice-standup` and `/alice-review`.
+After `claude-sharester sync`, commands appear in your Claude Code as `/alice-standup` and `/alice-review`, and skills appear in the skills list as `/alice-platform-quality`.
 
 ## Atlassian credentials
 
@@ -181,9 +184,19 @@ To confirm the LaunchAgent is loaded:
 launchctl list | grep sharester
 ```
 
+## Skills vs commands
+
+Claude Code distinguishes between **skills** (`~/.claude/skills/<name>/SKILL.md`) and **commands** (`~/.claude/commands/<name>.md`). Skills appear in the skills list; commands appear only as slash commands.
+
+claude-sharester detects skills automatically:
+- Any synced file with a `name:` field in its YAML frontmatter is treated as a skill
+- GitHub repos with a `.claude/skills/<name>/SKILL.md` directory layout are also picked up
+
+Both GitHub and Confluence sources are handled. The installed skill directories are namespaced with the source prefix: `~/.claude/skills/<prefix>-<name>/SKILL.md`.
+
 ## Config
 
-Sources are stored at `~/.claude/sharester.json`. Symlinks are created in `~/.claude/commands/` and `~/.claude/scripts/`. Synced repos are cloned to `~/.claude/skills/<id>/`.
+Sources are stored at `~/.claude/sharester.json`. Command symlinks are created in `~/.claude/commands/` and `~/.claude/scripts/`. Skill directories are created in `~/.claude/skills/<prefix>-<name>/`. Synced repos are cloned to `~/.claude/skills/<id>/`.
 
 > **Note:** `claude-sharester remove <id>` deletes the source's symlinks but leaves the cloned repo under `~/.claude/skills/<id>/` on disk. Remove that directory manually if you want to free the space.
 

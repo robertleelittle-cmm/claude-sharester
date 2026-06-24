@@ -2,7 +2,7 @@ import { program } from 'commander';
 import chalk from 'chalk';
 import { loadConfig, saveConfig, ensureDirs, getConfigPath } from './config.js';
 import { syncAll } from './sync.js';
-import { removeSourceSymlinks } from './symlinks.js';
+import { removeSourceSymlinks, removeSourceSkillDirs } from './symlinks.js';
 import { scheduleSync, unschedule, getScheduleStatus } from './schedule.js';
 import { runInit } from './init.js';
 import { ask, choose, pickSource } from './prompt.js';
@@ -202,10 +202,12 @@ Example:
     }
     const { prefix } = config.sources[idx];
     const removed = removeSourceSymlinks(prefix);
+    const removedSkills = removeSourceSkillDirs(prefix);
     config.sources.splice(idx, 1);
     saveConfig(config);
     console.log(chalk.green(`Removed source "${id}".`));
     if (removed.length) console.log(chalk.dim(`Deleted symlinks: ${removed.join(', ')}`));
+    if (removedSkills.length) console.log(chalk.dim(`Deleted skill dirs: ${removedSkills.join(', ')}`));
   });
 
 // ── set-branch ───────────────────────────────────────────────────────────────

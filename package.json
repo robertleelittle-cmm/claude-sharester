@@ -1,6 +1,6 @@
 {
   "name": "claude-sharester",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Sync Claude Code commands from GitHub repos and Confluence pages",
   "type": "module",
   "bin": {
