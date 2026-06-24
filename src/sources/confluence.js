@@ -161,7 +161,17 @@ function storageXmlToMarkdown(xml) {
     .replace(/&nbsp;/g, ' ');
 
   // Normalise blank lines
-  return out.replace(/\n{3,}/g, '\n\n').trim() + '\n';
+  out = out.replace(/\n{3,}/g, '\n\n').trim() + '\n';
+
+  // Restore YAML frontmatter: Confluence converts ---\nkey: val\n--- into
+  // <hr> + <h2>key: val</h2> (the trailing --- is consumed as a setext underline).
+  // Only match heading lines that look like key: value pairs (contain a colon).
+  out = out.replace(/^---\n((?:#+ \w[^:\n]+:[^\n]*\n)+)/, (_, fields) => {
+    const yaml = fields.replace(/^#+ /gm, '').trim();
+    return `---\n${yaml}\n---\n\n`;
+  });
+
+  return out;
 }
 
 function parseCodeBlocks(storageXml) {
