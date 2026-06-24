@@ -77,6 +77,19 @@ claude-sharester add confluence 12345678 --prefix team
 claude-sharester sync
 ```
 
+## Local development
+
+If you're working on the source directly instead of installing from npm:
+
+```bash
+git clone https://github.com/robertleelittle-cmm/claude-sharester.git
+cd claude-sharester
+npm install
+npm link        # makes `claude-sharester` available globally from this local copy
+```
+
+Changes to `src/` are reflected immediately — no build step required.
+
 ## Config
 
 Sources are stored at `~/.claude/sharester.json`. Symlinks are created in `~/.claude/commands/` and `~/.claude/scripts/`. Synced repos are cloned to `~/.claude/skills/<id>/`.
