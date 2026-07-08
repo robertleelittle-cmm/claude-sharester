@@ -7,14 +7,16 @@ export async function syncGithub(source) {
   const cloneDir = join(getSkillsDir(), source.id);
   const { overrideCleared } = await resolveCheckout(source, cloneDir);
 
-  const scripts = discoverFiles(join(cloneDir, '.claude', 'scripts'))
+  const scriptsPath = resolveRepoDir(cloneDir, 'scripts');
+  const scripts = discoverFiles(scriptsPath)
     .map(filePath => ({ scriptName: basename(filePath), filePath }));
 
   const scriptNames = new Set(scripts.map(s => s.scriptName));
 
+  const commandsPath = resolveRepoDir(cloneDir, 'commands');
   const commands = [];
   const skills = [];
-  for (const filePath of discoverFiles(join(cloneDir, '.claude', 'commands'), '.md')) {
+  for (const filePath of discoverFiles(commandsPath, '.md')) {
     const processed = rewriteScriptRefs(filePath, source.prefix, scriptNames, cloneDir);
     const content = readFileSync(processed, 'utf8');
     const skillName = extractSkillName(content);
@@ -26,7 +28,7 @@ export async function syncGithub(source) {
   }
 
   // Also pick up .claude/skills/<name>/SKILL.md in the repo
-  const skillsSourceDir = join(cloneDir, '.claude', 'skills');
+  const skillsSourceDir = resolveRepoDir(cloneDir, 'skills');
   if (existsSync(skillsSourceDir)) {
     for (const entry of readdirSync(skillsSourceDir)) {
       const skillFile = join(skillsSourceDir, entry, 'SKILL.md');
@@ -126,6 +128,14 @@ function extractSkillName(content) {
   if (!fmMatch) return null;
   const nameMatch = fmMatch[1].match(/^name:\s*(.+)$/m);
   return nameMatch?.[1]?.trim().replace(/^['"]|['"]$/g, '') ?? null;
+}
+
+// Returns .claude/<subdir> if it exists, otherwise <subdir> at repo root.
+// discoverFiles handles the non-existent case by returning [].
+function resolveRepoDir(cloneDir, subdir) {
+  const dotClaudePath = join(cloneDir, '.claude', subdir);
+  if (existsSync(dotClaudePath)) return dotClaudePath;
+  return join(cloneDir, subdir);
 }
 
 function discoverFiles(dir, ext = null) {
