@@ -27,16 +27,12 @@ export async function syncGithub(source) {
     }
   }
 
-  // Also pick up .claude/skills/<name>/SKILL.md in the repo
-  const skillsSourceDir = resolveRepoDir(cloneDir, 'skills');
-  if (existsSync(skillsSourceDir)) {
-    for (const entry of readdirSync(skillsSourceDir)) {
-      const skillFile = join(skillsSourceDir, entry, 'SKILL.md');
-      if (!existsSync(skillFile)) continue;
-      const content = readFileSync(skillFile, 'utf8');
-      const skillName = extractSkillName(content) ?? entry;
-      skills.push({ skillName, filePath: skillFile });
-    }
+  // Pick up any SKILL.md files anywhere in the repo (handles flat skills/ dirs
+  // and deeply nested structures like src/plugins/<plugin>/skills/<name>/SKILL.md)
+  for (const skillFile of findSkillFiles(cloneDir)) {
+    const content = readFileSync(skillFile, 'utf8');
+    const skillName = extractSkillName(content) ?? basename(skillFile.replace(/\/SKILL\.md$/, ''));
+    skills.push({ skillName, filePath: skillFile });
   }
 
   return { commands, skills, scripts, cloneDir, overrideCleared };
@@ -136,6 +132,24 @@ function resolveRepoDir(cloneDir, subdir) {
   const dotClaudePath = join(cloneDir, '.claude', subdir);
   if (existsSync(dotClaudePath)) return dotClaudePath;
   return join(cloneDir, subdir);
+}
+
+const SKIP_DIRS = new Set(['.git', '.processed', 'node_modules']);
+
+// Recursively finds all SKILL.md files in the repo, skipping .git etc.
+function findSkillFiles(dir) {
+  const results = [];
+  for (const entry of readdirSync(dir)) {
+    if (SKIP_DIRS.has(entry)) continue;
+    const full = join(dir, entry);
+    const stat = lstatSync(full);
+    if (stat.isDirectory()) {
+      results.push(...findSkillFiles(full));
+    } else if (entry === 'SKILL.md') {
+      results.push(full);
+    }
+  }
+  return results;
 }
 
 function discoverFiles(dir, ext = null) {
