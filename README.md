@@ -18,7 +18,7 @@ npm install -g claude-sharester
 
 ```bash
 # Add a GitHub repo that contains .claude/commands/*.md files
-claude-sharester add github https://github.com/your-teammate/tools.git --prefix alice
+claude-sharester add github git@github.com:your-teammate/tools.git --prefix alice
 
 # Pull commands and create symlinks in ~/.claude/commands/
 claude-sharester sync
@@ -26,6 +26,8 @@ claude-sharester sync
 # Auto-sync every 15 minutes via macOS LaunchAgent
 claude-sharester schedule --interval 15m --method launchagent
 ```
+
+> **Use SSH remotes (`git@github.com:...`), not HTTPS.** claude-sharester just passes the URL straight to `git clone`/`git pull`, so either works — but HTTPS git auth is unreliable in locked-down corporate environments, while SSH keys just work. Make sure `gh auth status` (or `git remote -v` on an existing clone) shows `ssh` before adding a source.
 
 Commands are symlinked as `<prefix>-<commandname>.md` so multiple teammates' commands never conflict.
 
@@ -55,7 +57,7 @@ Test a teammate's PR branch before it merges — point any GitHub source at a fo
 ```bash
 # Your fork's PR branch
 claude-sharester set-branch owen standup-temp-dir-and-browser-open \
-  --remote https://github.com/your-fork/tools.git
+  --remote git@github.com:your-fork/tools.git
 claude-sharester sync
 ```
 
@@ -156,7 +158,7 @@ The check is non-blocking and silently skipped when offline or if the network ti
 If you're working on the source directly instead of installing from npm:
 
 ```bash
-git clone https://github.com/robertleelittle-cmm/claude-sharester.git
+git clone git@github.com:robertleelittle-cmm/claude-sharester.git
 cd claude-sharester
 npm install
 npm link        # makes `claude-sharester` available globally from this local copy
@@ -208,7 +210,7 @@ If you previously set up a repo clone and LaunchAgent by hand, remove the old La
 launchctl unload ~/Library/LaunchAgents/com.claude.owen-skills-sync.plist
 rm ~/Library/LaunchAgents/com.claude.owen-skills-sync.plist
 
-claude-sharester add github https://github.com/your-teammate/tools.git --prefix owen
+claude-sharester add github git@github.com:your-teammate/tools.git --prefix owen
 claude-sharester sync
 claude-sharester schedule
 ```
