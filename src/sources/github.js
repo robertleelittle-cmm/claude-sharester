@@ -5,7 +5,7 @@ import { getSkillsDir, getScriptsDir } from '../config.js';
 
 export async function syncGithub(source) {
   const cloneDir = join(getSkillsDir(), source.id);
-  const { overrideCleared } = await resolveCheckout(source, cloneDir);
+  const { overrideCleared, rebaseConflict } = await resolveCheckout(source, cloneDir);
 
   const scriptsPath = resolveRepoDir(cloneDir, 'scripts');
   const scripts = discoverFiles(scriptsPath)
@@ -35,7 +35,7 @@ export async function syncGithub(source) {
     skills.push({ skillName, filePath: skillFile });
   }
 
-  return { commands, skills, scripts, cloneDir, overrideCleared };
+  return { commands, skills, scripts, cloneDir, overrideCleared, rebaseConflict };
 }
 
 // Checks out the right ref for the source: override branch if set and still
@@ -73,14 +73,39 @@ async function resolveCheckout(source, cloneDir) {
     }
 
     await execa('git', ['-C', cloneDir, 'fetch', remoteName, override.branch], { stdio: 'pipe' });
+    const mainBranch = await fetchOriginMain(cloneDir);
     await execa('git', ['-C', cloneDir, 'checkout', '--detach', `${remoteName}/${override.branch}`], { stdio: 'pipe' });
-    return { overrideCleared: false };
+
+    // Rebase onto the freshest main so files the branch doesn't touch stay
+    // current with teammates' other changes; only the branch's own edits
+    // stay overridden. Falls back to the branch as-is if it no longer
+    // applies cleanly.
+    const rebaseOk = await execa('git', ['-C', cloneDir, 'rebase', `origin/${mainBranch}`], { stdio: 'pipe' })
+      .then(() => true)
+      .catch(async () => {
+        await execa('git', ['-C', cloneDir, 'rebase', '--abort'], { stdio: 'pipe' }).catch(() => {});
+        return false;
+      });
+
+    return { overrideCleared: false, rebaseConflict: !rebaseOk };
   }
 
   if (!isNew) {
     await checkoutMain(cloneDir);
   }
   return { overrideCleared: false };
+}
+
+// Fetches origin's default branch (main, falling back to master) and
+// returns its name so callers can rebase onto `origin/<name>`.
+async function fetchOriginMain(cloneDir) {
+  try {
+    await execa('git', ['-C', cloneDir, 'fetch', 'origin', 'main'], { stdio: 'pipe' });
+    return 'main';
+  } catch {
+    await execa('git', ['-C', cloneDir, 'fetch', 'origin', 'master'], { stdio: 'pipe' });
+    return 'master';
+  }
 }
 
 async function checkoutMain(cloneDir) {

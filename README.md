@@ -61,7 +61,13 @@ claude-sharester set-branch owen standup-temp-dir-and-browser-open \
 claude-sharester sync
 ```
 
-The override is stored in config and applied on every sync. When the PR is merged and the branch is deleted, the next sync detects the missing branch, prints a notice, and automatically reverts to main — no manual cleanup needed:
+The override is stored in config and applied on every sync. Every sync, the branch is rebased onto the latest `main` before its commands/skills are synced — so files the branch doesn't touch stay current with whatever teammates have merged since, and only the files the branch actually edits show its changes. If the branch no longer applies cleanly on top of main, sync falls back to the branch as-is and warns:
+
+```
+⚠  Branch "standup-temp-dir-and-browser-open" conflicts with the latest main — showing the branch as-is; other files may lag behind main until the branch is updated.
+```
+
+When the PR is merged and the branch is deleted, the next sync detects the missing branch, prints a notice, and automatically reverts to main — no manual cleanup needed:
 
 ```
 ⚠  Branch "standup-temp-dir-and-browser-open" no longer exists on remote — override cleared, reverted to main.
