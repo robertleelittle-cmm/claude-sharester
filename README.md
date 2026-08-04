@@ -42,6 +42,7 @@ Commands are symlinked as `<prefix>-<commandname>.md` so multiple teammates' com
 | `remove [id]` | Remove a source and delete its symlinks (prompts to pick if ID omitted) |
 | `set-branch [id] [branch] [--remote <url>]` | Sync from a fork branch instead of main (prompts if args omitted) |
 | `clear-branch [id]` | Remove branch override, revert to main on next sync (prompts if ID omitted) |
+| `agent-guidance` | Install AI-agent guidance for safely editing and branching a synced skill/command |
 | `list` | Show all configured sources |
 | `sync [--source id]` | Pull all sources (or one) and refresh symlinks |
 | `schedule [--interval 15m] [--method launchagent\|cron]` | Install auto-sync daemon |
@@ -81,6 +82,16 @@ claude-sharester sync
 ```
 
 Active overrides are shown in `claude-sharester list` and `claude-sharester status`.
+
+## AI agent guidance
+
+If you use Claude Code (or another AI coding agent) to edit a teammate's synced skill or command, it needs to know two non-obvious things: the files under `~/.claude/commands/`, `~/.claude/scripts/`, and `~/.claude/skills/<prefix>-<name>/` are generated output that gets overwritten on the next sync — the real source is the git clone at `~/.claude/skills/<id>/` — and branching/forking should be offered when edits accumulate, not done automatically on the first touch.
+
+```bash
+claude-sharester agent-guidance
+```
+
+Installs as a global Claude Code skill, a snippet in `~/.claude/CLAUDE.md`, or both — your choice. It's also offered during `claude-sharester init`, and if you skip it, a one-line reminder shows up (throttled to once a day) until it's set up.
 
 ## GitHub sources
 

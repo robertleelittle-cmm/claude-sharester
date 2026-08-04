@@ -2,6 +2,7 @@ import { createInterface } from 'readline';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { promptInstallGuidance } from './agentGuidance.js';
 
 const ZSHRC = join(homedir(), '.zshrc');
 const BASHRC = join(homedir(), '.bashrc');
@@ -67,4 +68,6 @@ export async function runInit() {
 
   console.log(`\nWrote credentials to ${rcFile}.`);
   console.log(`Run \`source ${rcFile}\` or open a new terminal for the changes to take effect.\n`);
+
+  await promptInstallGuidance();
 }

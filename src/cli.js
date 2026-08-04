@@ -7,6 +7,7 @@ import { scheduleSync, unschedule, getScheduleStatus } from './schedule.js';
 import { runInit } from './init.js';
 import { ask, choose, pickSource } from './prompt.js';
 import { checkForUpdates } from './update-check.js';
+import { promptInstallGuidance, maybeNudgeAgentGuidance } from './agentGuidance.js';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -217,9 +218,11 @@ program
   .description('Pin a GitHub source to a specific branch or fork, e.g. to test a PR')
   .option('--remote <url>', 'Fork remote URL to fetch from (defaults to the source\'s registered URL)')
   .addHelpText('after', `
-The override is stored in config and applied on every sync. When the branch is
-deleted (e.g. after a PR merges), the next sync detects it, prints a notice, and
-automatically reverts to main — no manual cleanup needed.
+The override is stored in config and applied on every sync. Each sync rebases
+the branch onto the latest main first, so files the branch doesn't touch stay
+current with teammates' other changes — only the branch's own edits show.
+When the branch is deleted (e.g. after a PR merges), the next sync detects it,
+prints a notice, and automatically reverts to main — no manual cleanup needed.
 
 Examples:
   # Pin to a branch on the same remote
@@ -281,6 +284,28 @@ program
     delete source.override;
     saveConfig(config);
     console.log(chalk.green(`Branch override cleared for "${id}". Run \`claude-sharester sync\` to revert to main.`));
+  });
+
+// ── agent-guidance ───────────────────────────────────────────────────────────
+
+program
+  .command('agent-guidance')
+  .description('Install AI-agent guidance for safely editing and branching a synced skill/command')
+  .addHelpText('after', `
+Skills/commands synced by claude-sharester are generated output — editing them
+directly under ~/.claude/commands/ or ~/.claude/skills/<prefix>-<name>/ gets
+overwritten by the next sync. This installs guidance (as a global skill, a
+~/.claude/CLAUDE.md snippet, or both) that teaches your AI assistant to:
+  - edit the real clone under ~/.claude/skills/<id>/, not the generated output
+  - let you iterate freely before creating any branch
+  - offer to formalize into a branch/fork once edits accumulate, not before
+  - keep that branch pushed after every edit once it exists, so teammates
+    pointed at it via \`set-branch\` get live updates automatically
+
+Example:
+  $ claude-sharester agent-guidance`)
+  .action(async () => {
+    await promptInstallGuidance({ skipIfInstalled: false });
   });
 
 // ── list ──────────────────────────────────────────────────────────────────────
@@ -399,6 +424,9 @@ program
     console.log(chalk.dim(`\nConfig: ${getConfigPath()}\n`));
   });
 
-program.hook('postAction', async () => { await checkForUpdates(); });
+program.hook('postAction', async () => {
+  await checkForUpdates();
+  maybeNudgeAgentGuidance();
+});
 
 program.parse();
